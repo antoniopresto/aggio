@@ -733,7 +733,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
 }
 
 export function aggio<Doc extends TDocument>(
-  input: DB<Doc> | DBOptions<Doc> | Doc[],
+  input: DB<Doc> | DBOptions<Doc> | Doc[] | Readonly<DB<Doc> | DBOptions<Doc> | Doc[]>,
   aggregation: Aggregation<Doc> | Aggregation<any>
 ) {
   const db =
@@ -741,7 +741,7 @@ export function aggio<Doc extends TDocument>(
       ? createDB({ docs: input.getAllData() })
       : Array.isArray(input)
       ? createDB({ docs: input })
-      : createDB(input);
+      : createDB(input as any);
 
   const operations = (aggregation as Aggregation<{ [K: string]: string }>).map((operation) => getEntry(operation));
   const ops: { op: typeof operations[number]; res: any }[] = [];
@@ -1055,7 +1055,7 @@ export function aggio<Doc extends TDocument>(
   return res;
 }
 
-export function createDB<Doc extends TDocument, O extends DBOptions>(options?: O): DB<Doc> {
+export function createDB<Doc extends TDocument, O extends DBOptions<Doc>>(options?: O): DB<Doc> {
   return new DB(options);
 }
 

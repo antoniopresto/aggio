@@ -3,14 +3,14 @@ import camelCase from 'lodash/camelCase';
 import capitalize from 'lodash/capitalize';
 import get from 'lodash/get';
 import kebabCase from 'lodash/kebabCase';
+import lowerCase from 'lodash/lowerCase';
+import lowerFirst from 'lodash/lowerFirst';
 import snakeCase from 'lodash/snakeCase';
 import startCase from 'lodash/startCase';
 import template from 'lodash/template';
 import templateSettings from 'lodash/templateSettings';
 import upperCase from 'lodash/upperCase';
 import upperFirst from 'lodash/upperFirst';
-import lowerFirst from 'lodash/lowerFirst';
-import lowerCase from 'lodash/lowerCase';
 
 templateSettings.interpolate = /{([\s\S]+?)}/g;
 export { get, template, TemplateOptions };
