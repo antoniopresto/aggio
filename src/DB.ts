@@ -21,7 +21,9 @@ import {
   Query,
   RemoveOptions,
   Sort,
+  StringifyDefinition,
   TDocument,
+  TemplateDefinition,
   UpdateCallback,
   UpdateDefinition,
   UpdateOptions,
@@ -29,7 +31,7 @@ import {
 } from './interfaces';
 import model from './model';
 import { Persistence } from './persistence';
-import { getEntry, maybePromise } from './util';
+import { get, getEntry, isNullish, maybePromise, stringCase, template, templateUtils } from './util';
 
 function _defaultConfig(): DBOptions {
   return { inMemoryOnly: false, autoload: true, storage: createSyncStorage() as any };
@@ -67,7 +69,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
 
     if (!(this.storage && this.storage.getItem && this.storage.setItem && this.storage.removeItem)) {
       throw new Error(
-        `expected options.storage to be defined. \n--> received ${
+        `Expected options.storage to be defined. \n--> received ${
           this.storage ? `object with keys: [${Object.getOwnPropertyNames(this.storage).join(', ')}]` : this.storage
         }`
       );
@@ -741,68 +743,209 @@ export function aggio<Doc extends TDocument>(
       ? createDB({ docs: input })
       : createDB(input);
 
-  const operations = aggregation.map((operation) => getEntry(operation));
+  const operations = (aggregation as Aggregation<{ [K: string]: string }>).map((operation) => getEntry(operation));
   const ops: { op: typeof operations[number]; res: any }[] = [];
 
   function getKeyValue(item: TDocument, key: string | number) {
-    const el = aggio([item], [{ $project: { [key]: 1 } }, { $matchOne: {} }]);
-    const keyValue = Object.values(el)[0];
-    const tof = typeof keyValue;
-    if (!['number', 'string'].includes(tof)) throw new Error(`invalid type of key ${tof}`);
-    return `${keyValue}`;
+    if (!`${key}`.match(/[.[]/)) return item[key];
+    return get(item, key);
+  }
+
+  function assertObjectKey(key, message?: (type: string) => string) {
+    const tof = typeof key;
+    if (!['number', 'string', 'undefined', 'null'].includes(tof)) {
+      throw new Error(message ? `${tof}: ${message(tof)}` : `Invalid type of key ${tof}`);
+    }
+    return `${key}`;
   }
 
   let lastSort: Sort = { _id: -1 };
 
+  const getValue = (doc, key: string, $stringify?: StringifyDefinition) => {
+    if (key.startsWith('#')) {
+      return key.slice(1);
+    }
+    if (key.startsWith('\\')) key = key.slice(1);
+
+    let value = getKeyValue(doc, key);
+
+    if (typeof $stringify === 'object') {
+      try {
+        return _stringify({ doc, template: $stringify, value });
+      } catch (e: any) {
+        throw new Error(`Failed to parse key ${JSON.stringify(key)}: ` + e.message || '');
+      }
+    }
+
+    if (!isNullish(value) && $stringify) {
+      value = value.toString();
+      if (!stringCase[$stringify]) throw new Error(`Invalid stringCase ${$stringify}`);
+      value = stringCase[$stringify](value);
+    }
+
+    return value;
+  };
+
+  let $last = false;
+  let $first = false;
+  let $limit = NaN;
+
   operations.forEach((op) => {
-    switch (op.k) {
+    switch (op.key) {
+      case '$last': {
+        $last = true;
+        break;
+      }
+      case '$first': {
+        $first = true;
+        break;
+      }
+      case '$limit': {
+        $limit = op.value;
+        break;
+      }
       case '$update': {
-        const { $match = {}, $multi = true, $upsert = false, ...update } = op.v;
-        db.update($match, update, { multi: $multi, upsert: $upsert });
+        const { $match = {}, $multi = true, $upsert = false, ...update } = op.value;
+        db.update($match, update as any, { multi: $multi, upsert: $upsert });
         ops.push({ res: db.find({}).sort(lastSort).exec(), op });
         break;
       }
       case '$matchOne': {
-        const item = db.findOne(op.v).exec();
+        const item = db.findOne(op.value).exec();
         ops.push({ res: item, op });
         if (item) {
           db.resetIndexes([item]);
         }
         break;
       }
-      case '$limit': {
-        const items = db.find({}).sort(lastSort).limit(op.v).exec();
-        db.resetIndexes(items);
-        ops.push({ res: items, op });
-        break;
-      }
       case '$sort': {
-        lastSort = op.v;
-        const items = db.find({}).sort(op.v).exec();
+        lastSort = op.value;
+        const items = db.find({}).sort(op.value).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
       case '$match': {
-        const items = db.find(op.v).sort(lastSort).exec();
+        const items = db.find(op.value).sort(lastSort).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
       case '$project': {
-        const items = db.find({}).sort(lastSort).project(op.v).exec();
+        const items = db.find({}).sort(lastSort).project(op.value).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
+      case '$template': {
+        const items = db.find({}).sort(lastSort).exec();
+        db.resetIndexes(items);
+        const template = op.original;
+        ops.push({
+          res: items.map((doc) => {
+            return _stringify({ doc, template, value: doc });
+          }),
+          op,
+        });
+        break;
+      }
+
+      case '$pick': {
+        const key = op.value;
+
+        if (typeof key === 'string') {
+          const item = db
+            .findOne({})
+            .sort(lastSort)
+            .project({ [key]: 1 })
+            .exec();
+
+          if (item) {
+            db.resetIndexes([item]);
+          }
+          const res = item ? getKeyValue(item, key) : item;
+          ops.push({ res, op });
+          break;
+        }
+
+        const { $stringify, ...conf } = key;
+        const config = getEntry(conf);
+
+        switch (config.key) {
+          case '$join': {
+            const item = db.findOne({}).sort(lastSort).exec();
+
+            if (!item) {
+              ops.push({ res: null, op });
+              break;
+            }
+
+            let invalid = false;
+            const res = config.value
+              .map((k) => {
+                const v = getValue(item, k, $stringify);
+                if (isNullish(v)) {
+                  invalid = true;
+                }
+                return v;
+              })
+              .join('');
+            if (invalid) break;
+            if (!res) break;
+            ops.push({ res, op });
+            break;
+          }
+          case '$joinEach': {
+            const items = db.find({}).sort(lastSort).exec();
+            const res: any[] = [];
+
+            items.forEach((item) => {
+              let invalid = false;
+              const value = config.value
+                .map((k) => {
+                  const v = getValue(item, k, $stringify);
+                  if (isNullish(v)) invalid = true;
+                  return v;
+                })
+                .join('');
+
+              if (invalid) return;
+              if (!value) return;
+
+              res.push(value);
+            });
+
+            ops.push({ res, op });
+            break;
+          }
+
+          case '$each': {
+            const items = db.find({}).sort(lastSort).exec();
+            const res: any[] = [];
+
+            items.forEach((item) => {
+              (Array.isArray(config.value) ? config.value : [config.value]).forEach((k: string) => {
+                const value = getValue(item, k, $stringify);
+                if (isNullish(value)) return;
+                res.push(value);
+              });
+            });
+
+            ops.push({ res, op });
+            break;
+          }
+        }
+
+        break;
+      }
       case '$groupBy': {
         const group: Record<string, any[]> = {};
-        const items = db.find(op.v).sort(lastSort).exec();
+        const items = db.find(op.value).sort(lastSort).exec();
 
-        const key = Object.keys(op.v)[0];
+        const key = Object.keys(op.value)[0];
 
         items.forEach((el) => {
-          const keyValue = getKeyValue(el, key);
+          const keyValue = assertObjectKey(getKeyValue(el, key));
           group[keyValue] = group[keyValue] || [];
           group[keyValue].push(el);
         });
@@ -812,17 +955,41 @@ export function aggio<Doc extends TDocument>(
         break;
       }
       case '$keyBy': {
-        const $onMany = op.v.$onMany;
+        const $onMany = op.value.$onMany;
         const group: Record<string, { value: any; asList?: boolean }> = {};
-        const items = db.find(op.v).sort(lastSort).exec();
 
-        const key = Object.keys(op.v)[0];
+        const _op = { ...op.value };
+        delete _op.$onMany;
+
+        const { key, value } = getEntry(_op);
+
+        const query = { ...op.value };
+        // @ts-ignore
+        delete query.$pick;
+        delete query.$onMany;
+        const items = db.find(query).sort(lastSort).exec();
+
+        assertObjectKey(key);
 
         items.forEach((el) => {
-          const keyValue = getKeyValue(el, key);
+          let keyValue: string;
+
+          switch (key) {
+            case '$pick': {
+              const picked = aggio([el], [{ $pick: value! }]);
+              if (isNullish(picked)) return; // Not include nulls
+              keyValue = assertObjectKey(picked, (tof) => {
+                return `expected $pick result to be of type string found ${tof} - Operation:${JSON.stringify(op)}`;
+              });
+              break;
+            }
+            default: {
+              keyValue = assertObjectKey(getKeyValue(el, key));
+            }
+          }
 
           if (group.hasOwnProperty(keyValue)) {
-            const msg = `found multiple items with key ${keyValue}`;
+            const msg = `Found multiple items with key ${keyValue}`;
             switch ($onMany) {
               case 'list': {
                 const { value, asList } = group[keyValue];
@@ -871,7 +1038,21 @@ export function aggio<Doc extends TDocument>(
     }
   });
 
-  return ops[ops.length - 1]?.res;
+  let res = ops[ops.length - 1]?.res;
+
+  if ($first) {
+    res = res?.[0];
+  }
+
+  if ($last) {
+    res = res?.length ? res[res.length - 1] : undefined;
+  }
+
+  if (!isNaN($limit)) {
+    res = res?.slice?.(0, $limit);
+  }
+
+  return res;
 }
 
 export function createDB<Doc extends TDocument, O extends DBOptions>(options?: O): DB<Doc> {
@@ -884,4 +1065,23 @@ function _updateOptions(): Required<UpdateOptions> {
     returnUpdatedDocs: true,
     upsert: false,
   };
+}
+
+function _stringify(input: { template: TemplateDefinition; doc: Record<string, any>; value: any }) {
+  const { template: $template, doc, value } = input;
+
+  const executor = template($template.$template, {
+    ...$template.options,
+    imports: {
+      ...templateUtils,
+      ...$template.options?.imports,
+    },
+  });
+
+  const data =
+    value && typeof value === 'object' //
+      ? { ...doc, ...value, $doc: doc, $val: value }
+      : { $value: value, $doc: doc };
+
+  return executor(data);
 }

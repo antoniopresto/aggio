@@ -1,3 +1,20 @@
+import type { TemplateOptions } from 'lodash';
+import camelCase from 'lodash/camelCase';
+import capitalize from 'lodash/capitalize';
+import get from 'lodash/get';
+import kebabCase from 'lodash/kebabCase';
+import snakeCase from 'lodash/snakeCase';
+import startCase from 'lodash/startCase';
+import template from 'lodash/template';
+import templateSettings from 'lodash/templateSettings';
+import upperCase from 'lodash/upperCase';
+import upperFirst from 'lodash/upperFirst';
+import lowerFirst from 'lodash/lowerFirst';
+import lowerCase from 'lodash/lowerCase';
+
+templateSettings.interpolate = /{([\s\S]+?)}/g;
+export { get, template, TemplateOptions };
+
 export function isError(obj) {
   return !!Object.prototype.toString.call(obj).match(/object \d*Error/);
 }
@@ -81,12 +98,47 @@ export const tupleEnum = <T extends string[]>(
 
 export function getEntry<T extends Record<string, any>>(
   item: T
-): T extends Record<string, any> ? (T extends unknown ? { k: keyof T; v: T[keyof T] } : never) : never {
+): T extends Record<string, any>
+  ? T extends unknown
+    ? { key: keyof T; value: T[keyof T]; original: T }
+    : never
+  : never {
   if (!item || typeof item !== 'object') throw new Error(`invalid object`);
 
   const list = Object.entries(item)[0];
   return {
-    k: list?.[0],
-    v: list?.[1],
+    key: list?.[0],
+    value: list?.[1],
+    original: item,
   } as any;
 }
+
+export function isNullish<V>(value: V) {
+  return value === '' || value === null || value === undefined;
+}
+
+export const stringCase = {
+  capitalize,
+  camelCase,
+  camelcase: camelCase,
+  kebabCase,
+  kebabcase: kebabCase,
+  snakeCase,
+  snakecase: startCase,
+  startCase,
+  startcase: startCase,
+  upperCase,
+  uppercase: upperCase,
+  upperFirst,
+  upperfirst: upperFirst,
+  lowerFirst,
+  lowerfirst: lowerFirst,
+  lowerCase,
+  lowercase: lowerCase,
+};
+
+export const templateUtils = {
+  ...stringCase,
+  time: () => Date.now(),
+  isoDate: () => new Date().toISOString(),
+};

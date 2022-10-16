@@ -1,4 +1,4 @@
-import { tupleEnum } from './util';
+import { stringCase, TemplateOptions, tupleEnum } from './util';
 
 export const objectModifies = tupleEnum(
   '$set',
@@ -44,7 +44,8 @@ export const aggregationOperatorKeys = tupleEnum(
   '$match',
   '$project',
   '$groupBy',
-  '$keyBy'
+  '$keyBy',
+  '$pick'
 );
 
 export type AggregationOperatorKeys = typeof aggregationOperatorKeys.enum;
@@ -57,7 +58,20 @@ export type AggregationOperatorKey = AggregationOperator<any> extends infer R
     : never
   : never;
 
+export type TemplateDefinition = { $template: string; options?: TemplateOptions };
+export type StringifyDefinition = keyof typeof stringCase | TemplateDefinition;
+
+export type PickDefinition<TSchema> = {
+  $pick:
+    | DotNotations<TSchema>
+    | { $join: (DotNotations<TSchema> | `#${string | number}`)[]; $stringify?: StringifyDefinition }
+    | { $joinEach: (DotNotations<TSchema> | `#${string | number}`)[]; $stringify?: StringifyDefinition }
+    | { $each: DotNotations<TSchema> | DotNotations<TSchema>[]; $stringify?: StringifyDefinition };
+};
+
 export type AggregationOperator<TSchema> =
+  | { $first: true | 1 }
+  | { $last: true | 1 }
   | { $update: UpdateDefinition<TSchema> & { $match?: Query<TSchema>; $multi?: boolean; $upsert?: boolean } }
   | { $matchOne: Query<TSchema> }
   | { $limit: number }
@@ -65,7 +79,9 @@ export type AggregationOperator<TSchema> =
   | { $match: Query<TSchema> }
   | { $project: TDocument }
   | { $groupBy: GroupByDefinition<TSchema> }
-  | { $keyBy: KeyByDefinition<TSchema> };
+  | { $keyBy: KeyByDefinition<TSchema> }
+  | PickDefinition<TSchema>
+  | TemplateDefinition;
 
 export type GroupByDefinition<TSchema> = {
   [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
@@ -73,11 +89,14 @@ export type GroupByDefinition<TSchema> = {
     : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
 };
 
-export type KeyByDefinition<TSchema> = {
-  [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
-    ? Property
-    : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
-} & {
+export type KeyByDefinition<TSchema extends any = { _id?: string }> = (
+  | {
+      [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
+        ? Property
+        : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
+    }
+  | PickDefinition<TSchema>
+) & {
   $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
 };
 
@@ -119,6 +138,8 @@ export declare type NestedPaths<Type> = Type extends string | number | boolean |
         : [Key, ...NestedPaths<Type[Key]>] | [Key];
     }[Extract<keyof Type, string>]
   : [];
+
+export type DotNotations<T> = Join<NestedPaths<T>, '.'>;
 
 export type PropertyType<Type, Property extends string> = string extends Property
   ? unknown
