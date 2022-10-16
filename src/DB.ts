@@ -1,7 +1,8 @@
 import util from 'util';
 
 import async from 'async';
-import _ from 'underscore';
+import intersection from 'underscore/modules/intersection';
+import pluck from 'underscore/modules/pluck';
 
 import { createSyncStorage } from './createSyncStorage';
 import { Cursor } from './cursor';
@@ -288,7 +289,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
               usableQueryKeys.push(k);
             }
           });
-          usableQueryKeys = _.intersection(usableQueryKeys, indexNames);
+          usableQueryKeys = intersection(usableQueryKeys, indexNames);
           if (usableQueryKeys.length > 0) {
             return cb(null, self.indexes[usableQueryKeys[0]].getMatching(query[usableQueryKeys[0]]));
           }
@@ -300,7 +301,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
               usableQueryKeys.push(k);
             }
           });
-          usableQueryKeys = _.intersection(usableQueryKeys, indexNames);
+          usableQueryKeys = intersection(usableQueryKeys, indexNames);
           if (usableQueryKeys.length > 0) {
             return cb(null, self.indexes[usableQueryKeys[0]].getMatching(query[usableQueryKeys[0]].$in));
           }
@@ -318,7 +319,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
               usableQueryKeys.push(k);
             }
           });
-          usableQueryKeys = _.intersection(usableQueryKeys, indexNames);
+          usableQueryKeys = intersection(usableQueryKeys, indexNames);
           if (usableQueryKeys.length > 0) {
             return cb(null, self.indexes[usableQueryKeys[0]].getBetweenBounds(query[usableQueryKeys[0]]));
           }
@@ -659,7 +660,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
             }
 
             // Update the datafile
-            let updatedDocs = _.pluck(modifications, 'newDoc');
+            let updatedDocs = pluck(modifications, 'newDoc');
             self.persistence.persistNewState(updatedDocs, function (err) {
               if (err) {
                 return callback(err);

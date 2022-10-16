@@ -1,7 +1,7 @@
 /**
  * Manage access to data, be it to find, update or remove it
  */
-import _ from 'underscore';
+import omit from 'underscore/modules/omit';
 
 import { DB } from './DB';
 import { Query, Sort, TDocument } from './Operations';
@@ -66,7 +66,7 @@ export class Cursor<Doc extends TDocument = TDocument, ExecResult = any> {
     }
 
     keepId = this._projection._id === 0 ? false : true;
-    this._projection = _.omit(this._projection, '_id');
+    this._projection = omit(this._projection, '_id');
 
     // Check for consistency
     keys = Object.keys(this._projection);

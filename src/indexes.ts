@@ -1,7 +1,7 @@
 import util from 'util';
 
 import { AVLTree as BinarySearchTree } from 'binary-search-tree';
-import _ from 'underscore';
+import uniq from 'underscore/modules/uniq';
 
 import model from './model';
 
@@ -84,7 +84,7 @@ export class Index {
       this.tree.insert(key, doc);
     } else {
       // If an insert fails due to a unique constraint, roll back all inserts before it
-      keys = _.uniq(key, projectForUnique);
+      keys = uniq(key, projectForUnique);
 
       for (i = 0; i < keys.length; i += 1) {
         try {
@@ -148,7 +148,7 @@ export class Index {
     if (!util.isArray(key)) {
       this.tree.delete(key, doc);
     } else {
-      _.uniq(key, projectForUnique).forEach(function (_key) {
+      uniq(key, projectForUnique).forEach(function (_key) {
         self.tree.delete(_key, doc);
       });
     }

@@ -5,7 +5,12 @@
  * Querying, update
  */
 
-import _ from 'underscore';
+import filter from 'underscore/modules/filter';
+import has from 'underscore/modules/has';
+import isBoolean from 'underscore/modules/isBoolean';
+import isFunction from 'underscore/modules/isFunction';
+import map from 'underscore/modules/map';
+import uniq from 'underscore/modules/uniq';
 
 import { ComparisonOperator } from './Operations';
 import { isDate, isRegExp } from './util';
@@ -459,7 +464,7 @@ lastStepModifierFunctions.$inc = function (obj, field, value) {
   }
 
   if (typeof obj[field] !== 'number') {
-    if (!_.has(obj, field)) {
+    if (!has(obj, field)) {
       obj[field] = value;
     } else {
       throw new Error("Don't use the $inc modifier on non-number fields");
@@ -520,10 +525,10 @@ Object.keys(lastStepModifierFunctions).forEach(function (modifier) {
  */
 function modify(obj, updateQuery) {
   let keys = Object.keys(updateQuery),
-    firstChars = _.map(keys, function (item) {
+    firstChars = map(keys, function (item) {
       return item[0];
     }),
-    dollarFirstChars = _.filter(firstChars, function (c) {
+    dollarFirstChars = filter(firstChars, function (c) {
       return c === '$';
     }),
     newDoc,
@@ -543,7 +548,7 @@ function modify(obj, updateQuery) {
     newDoc._id = obj._id;
   } else {
     // Apply modifiers
-    modifiers = _.uniq(keys);
+    modifiers = uniq(keys);
     newDoc = deepCopy(obj);
     modifiers.forEach(function (m) {
       let keys;
@@ -875,12 +880,12 @@ logicalOperators.$not = function (obj, query) {
 logicalOperators.$where = function (obj, fn) {
   let result;
 
-  if (!_.isFunction(fn)) {
+  if (!isFunction(fn)) {
     throw new Error('$where operator used without a function');
   }
 
   result = fn.call(obj);
-  if (!_.isBoolean(result)) {
+  if (!isBoolean(result)) {
     throw new Error('$where function must return boolean');
   }
 
@@ -966,10 +971,10 @@ function matchQueryPart(obj, queryKey, queryValue, treatObjAsValue?) {
   // or only normal fields. Mixed objects are not allowed
   if (queryValue !== null && typeof queryValue === 'object' && !isRegExp(queryValue) && !Array.isArray(queryValue)) {
     keys = Object.keys(queryValue);
-    firstChars = _.map(keys, function (item) {
+    firstChars = map(keys, function (item) {
       return item[0];
     });
-    dollarFirstChars = _.filter(firstChars, function (c) {
+    dollarFirstChars = filter(firstChars, function (c) {
       return c === '$';
     });
 
