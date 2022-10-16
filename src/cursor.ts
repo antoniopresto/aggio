@@ -45,7 +45,12 @@ export class Cursor<Doc extends TDocument = TDocument, ExecResult = any> {
   };
 
   sort = (sortQuery: Sort) => {
-    this._sort = sortQuery;
+    this._sort = Object.entries(sortQuery).reduce((acc, [k, v]) => {
+      return {
+        ...acc,
+        [k]: typeof v === 'number' ? v : v.startsWith('desc') ? -1 : 1,
+      };
+    }, {});
     return this;
   };
 

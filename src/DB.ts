@@ -1,6 +1,7 @@
 import util from 'util';
 
 import async from 'async';
+import clone from 'underscore/modules/clone';
 import intersection from 'underscore/modules/intersection';
 import pluck from 'underscore/modules/pluck';
 
@@ -141,7 +142,15 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
   resetIndexes(newData?: DocInput<Doc>[]) {
     let self = this;
 
-    Object.keys(this.indexes).forEach(function (i) {
+    Object.keys(this.indexes).forEach(function (i, index) {
+      newData = newData?.map((el) => {
+        if (!el._id) {
+          el = clone(el);
+          el._id = self.createNewId();
+        }
+        return el;
+      });
+
       self.indexes[i].reset(newData);
     });
   }
@@ -732,10 +741,17 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
   }
 }
 
+export type AggioOptions = {
+  excludeId?: boolean;
+};
+
 export function aggio<Doc extends TDocument>(
   input: DB<Doc> | DBOptions<Doc> | Doc[] | Readonly<DB<Doc> | DBOptions<Doc> | Doc[]>,
-  aggregation: Aggregation<Doc> | Aggregation<any>
+  aggregation: Aggregation<Doc> | Aggregation<any>,
+  options: AggioOptions = {}
 ) {
+  const { excludeId = true } = options;
+
   const db =
     'loadDatabase' in input
       ? createDB({ docs: input.getAllData() })
@@ -786,6 +802,33 @@ export function aggio<Doc extends TDocument>(
     return value;
   };
 
+  function findOne(query?) {
+    const res = db.findOne(query || {});
+    if (excludeId) {
+      const ex = res.exec;
+      res.exec = function (...args) {
+        const res = ex.apply(ex, args);
+        if (res) delete res._id;
+        return res;
+      };
+    }
+    return res;
+  }
+
+  function find(query?) {
+    const res = db.find(query || {});
+    if (excludeId) {
+      const ex = res.exec;
+      res.exec = function (...args) {
+        return ex.apply(ex, args).map((el) => {
+          delete el._id;
+          return el;
+        });
+      };
+    }
+    return res;
+  }
+
   let $last = false;
   let $first = false;
   let $limit = NaN;
@@ -807,11 +850,12 @@ export function aggio<Doc extends TDocument>(
       case '$update': {
         const { $match = {}, $multi = true, $upsert = false, ...update } = op.value;
         db.update($match, update as any, { multi: $multi, upsert: $upsert });
-        ops.push({ res: db.find({}).sort(lastSort).exec(), op });
+        ops.push({ res: find({}).sort(lastSort).exec(), op });
         break;
       }
       case '$matchOne': {
-        const item = db.findOne(op.value).exec();
+        const item = findOne(op.value).exec();
+
         ops.push({ res: item, op });
         if (item) {
           db.resetIndexes([item]);
@@ -820,25 +864,25 @@ export function aggio<Doc extends TDocument>(
       }
       case '$sort': {
         lastSort = op.value;
-        const items = db.find({}).sort(op.value).exec();
+        const items = find({}).sort(op.value).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
       case '$match': {
-        const items = db.find(op.value).sort(lastSort).exec();
+        const items = find(op.value).sort(lastSort).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
       case '$project': {
-        const items = db.find({}).sort(lastSort).project(op.value).exec();
+        const items = find({}).sort(lastSort).project(op.value).exec();
         db.resetIndexes(items);
         ops.push({ res: items, op });
         break;
       }
       case '$template': {
-        const items = db.find({}).sort(lastSort).exec();
+        const items = find({}).sort(lastSort).exec();
         db.resetIndexes(items);
         const template = op.original;
         ops.push({
@@ -873,7 +917,7 @@ export function aggio<Doc extends TDocument>(
 
         switch (config.key) {
           case '$join': {
-            const item = db.findOne({}).sort(lastSort).exec();
+            const item = findOne({}).sort(lastSort).exec();
 
             if (!item) {
               ops.push({ res: null, op });
@@ -896,7 +940,7 @@ export function aggio<Doc extends TDocument>(
             break;
           }
           case '$joinEach': {
-            const items = db.find({}).sort(lastSort).exec();
+            const items = find({}).sort(lastSort).exec();
             const res: any[] = [];
 
             items.forEach((item) => {
@@ -920,7 +964,7 @@ export function aggio<Doc extends TDocument>(
           }
 
           case '$each': {
-            const items = db.find({}).sort(lastSort).exec();
+            const items = find({}).sort(lastSort).exec();
             const res: any[] = [];
 
             items.forEach((item) => {
@@ -940,12 +984,29 @@ export function aggio<Doc extends TDocument>(
       }
       case '$groupBy': {
         const group: Record<string, any[]> = {};
-        const items = db.find(op.value).sort(lastSort).exec();
+        const items = find({}).sort(lastSort).exec();
 
-        const key = Object.keys(op.value)[0];
+        const _value = typeof op.value === 'string' ? { $pick: op.value } : op.value;
+        const _op = { ..._value };
+        const { key, value } = getEntry(_op);
 
         items.forEach((el) => {
-          const keyValue = assertObjectKey(getKeyValue(el, key));
+          let keyValue: string;
+
+          switch (key) {
+            case '$pick': {
+              const picked = aggio([el], [{ $pick: value! }], options);
+              if (isNullish(picked)) return; // Not include nulls
+              keyValue = assertObjectKey(picked, (tof) => {
+                return `expected $pick result to be of type string found ${tof} - Operation:${JSON.stringify(op)}`;
+              });
+              break;
+            }
+            default: {
+              keyValue = assertObjectKey(getKeyValue(el, key));
+            }
+          }
+
           group[keyValue] = group[keyValue] || [];
           group[keyValue].push(el);
         });
@@ -955,28 +1016,29 @@ export function aggio<Doc extends TDocument>(
         break;
       }
       case '$keyBy': {
-        const $onMany = op.value.$onMany;
+        const _value = typeof op.value === 'string' ? { $pick: op.value } : op.value;
+        const $onMany = _value.$onMany;
         const group: Record<string, { value: any; asList?: boolean }> = {};
 
-        const _op = { ...op.value };
+        const _op = { ..._value };
         delete _op.$onMany;
 
         const { key, value } = getEntry(_op);
 
-        const query = { ...op.value };
+        const query = { ..._value };
         // @ts-ignore
         delete query.$pick;
         delete query.$onMany;
-        const items = db.find(query).sort(lastSort).exec();
+        const items = find(query).sort(lastSort).exec();
 
         assertObjectKey(key);
 
         items.forEach((el) => {
           let keyValue: string;
 
-          switch (key) {
+          switch (key as string) {
             case '$pick': {
-              const picked = aggio([el], [{ $pick: value! }]);
+              const picked = aggio([el], [{ $pick: value! }], options);
               if (isNullish(picked)) return; // Not include nulls
               keyValue = assertObjectKey(picked, (tof) => {
                 return `expected $pick result to be of type string found ${tof} - Operation:${JSON.stringify(op)}`;

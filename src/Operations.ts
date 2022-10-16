@@ -83,22 +83,28 @@ export type AggregationOperator<TSchema> =
   | PickDefinition<TSchema>
   | TemplateDefinition;
 
-export type GroupByDefinition<TSchema> = {
-  [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
-    ? Property
-    : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
-};
-
-export type KeyByDefinition<TSchema extends any = { _id?: string }> = (
+export type GroupByDefinition<TSchema> =
   | {
       [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
         ? Property
         : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
     }
-  | PickDefinition<TSchema>
-) & {
-  $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
-};
+  | Join<NestedPaths<WithId<TSchema>>, '.'>;
+
+export type KeyByDefinition<TSchema extends any = { _id?: string }> =
+  | ((
+      | {
+          [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends
+            | number
+            | string
+            ? Property
+            : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
+        }
+      | PickDefinition<TSchema>
+    ) & {
+      $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
+    })
+  | Join<NestedPaths<WithId<TSchema>>, '.'>;
 
 // Some Types from The official MongoDB driver for Node.js
 export type Query<TSchema = TDocument> =

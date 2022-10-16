@@ -1,5 +1,7 @@
 import { aggio, createDB, DB } from '../DB';
 
+type UserWithAddress = { name: string; address?: { street: string } };
+
 describe('DB', () => {
   let db: DB<{ name: string }>;
 
@@ -8,6 +10,24 @@ describe('DB', () => {
   const Antonio = { name: 'Antonio' };
   const Rafaela = { name: 'Rafaela' };
   const users = [Antonio, Rafaela];
+
+  const usersWithAddress: UserWithAddress[] = [
+    {
+      name: 'Antonio',
+      address: {
+        street: 'Rua',
+      },
+    },
+    {
+      name: 'Rafaela',
+      address: {
+        street: 'Avenida',
+      },
+    },
+    {
+      name: 'Goat',
+    },
+  ];
 
   describe('aggio', () => {
     test('$matchOne', () => {
@@ -42,6 +62,56 @@ describe('DB', () => {
       expect(sut).toEqual('Rafaela#av');
     });
 
+    test('$keyBy: field.subField', () => {
+      const sut = aggio<UserWithAddress>(usersWithAddress, [
+        { $keyBy: 'address.street' },
+        { $sort: { name: -1 } }, //
+        { $matchOne: {} },
+      ]);
+
+      expect(sut).toEqual({
+        Avenida: {
+          address: {
+            street: 'Avenida',
+          },
+          name: 'Rafaela',
+        },
+        Rua: {
+          address: {
+            street: 'Rua',
+          },
+          name: 'Antonio',
+        },
+      });
+    });
+
+    test('$groupBy: field.subField', () => {
+      const sut = aggio<UserWithAddress>(usersWithAddress, [
+        { $groupBy: 'address.street' },
+        { $sort: { name: -1 } }, //
+        { $matchOne: {} },
+      ]);
+
+      expect(sut).toEqual({
+        Avenida: [
+          {
+            address: {
+              street: 'Avenida',
+            },
+            name: 'Rafaela',
+          },
+        ],
+        Rua: [
+          {
+            address: {
+              street: 'Rua',
+            },
+            name: 'Antonio',
+          },
+        ],
+      });
+    });
+
     test('$keyBy:{ $pick }', () => {
       const sut = aggio<{ name: string }>(users, [
         { $keyBy: { $pick: 'name' } },
@@ -56,7 +126,7 @@ describe('DB', () => {
     });
 
     test('$keyBy:{ $pick: `field.subField` }', () => {
-      const sut = aggio<{ name: string; address?: { street: string } }>(
+      const sut = aggio<UserWithAddress>(
         [
           {
             name: 'Antonio',
@@ -83,14 +153,12 @@ describe('DB', () => {
 
       expect(sut).toEqual({
         'rafaela#avenida': {
-          _id: expect.any(String),
           address: {
             street: 'Avenida',
           },
           name: 'Rafaela',
         },
         'antonio#rua': {
-          _id: expect.any(String),
           address: {
             street: 'Rua',
           },
@@ -132,14 +200,12 @@ describe('DB', () => {
 
       expect(sut).toEqual({
         'ANTONIO#rua': {
-          _id: expect.any(String),
           address: {
             street: 'Rua',
           },
           name: 'Antonio',
         },
         'RAFAELA#avenida': {
-          _id: expect.any(String),
           address: {
             street: 'Avenida',
           },
@@ -175,19 +241,16 @@ describe('DB', () => {
       expect(sut).toEqual({
         Antonio: [
           {
-            _id: expect.any(String),
             age: 55,
             name: 'Antonio',
           },
           {
-            _id: expect.any(String),
             age: 20,
             name: 'Antonio',
           },
         ],
         Rafaela: [
           {
-            _id: expect.any(String),
             age: 20,
             name: 'Rafaela',
           },

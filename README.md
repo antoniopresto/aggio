@@ -10,6 +10,8 @@ npm install aggio --save    # Put latest version in your package.json
 
 ```ts
 import { aggio, createDB, DB } from 'aggio';
+type UserWithAddress = { name: string; address?: { street: string } };
+
 describe('DB', () => {
   let db: DB<{ name: string }>;
 
@@ -18,6 +20,24 @@ describe('DB', () => {
   const Antonio = { name: 'Antonio' };
   const Rafaela = { name: 'Rafaela' };
   const users = [Antonio, Rafaela];
+
+  const usersWithAddress: UserWithAddress[] = [
+    {
+      name: 'Antonio',
+      address: {
+        street: 'Rua',
+      },
+    },
+    {
+      name: 'Rafaela',
+      address: {
+        street: 'Avenida',
+      },
+    },
+    {
+      name: 'Goat',
+    },
+  ];
 
   describe('aggio', () => {
     test('$matchOne', () => {
@@ -52,6 +72,56 @@ describe('DB', () => {
       expect(sut).toEqual('Rafaela#av');
     });
 
+    test('$keyBy: field.subField', () => {
+      const sut = aggio<UserWithAddress>(usersWithAddress, [
+        { $keyBy: 'address.street' },
+        { $sort: { name: -1 } }, //
+        { $matchOne: {} },
+      ]);
+
+      expect(sut).toEqual({
+        Avenida: {
+          address: {
+            street: 'Avenida',
+          },
+          name: 'Rafaela',
+        },
+        Rua: {
+          address: {
+            street: 'Rua',
+          },
+          name: 'Antonio',
+        },
+      });
+    });
+
+    test('$groupBy: field.subField', () => {
+      const sut = aggio<UserWithAddress>(usersWithAddress, [
+        { $groupBy: 'address.street' },
+        { $sort: { name: -1 } }, //
+        { $matchOne: {} },
+      ]);
+
+      expect(sut).toEqual({
+        Avenida: [
+          {
+            address: {
+              street: 'Avenida',
+            },
+            name: 'Rafaela',
+          },
+        ],
+        Rua: [
+          {
+            address: {
+              street: 'Rua',
+            },
+            name: 'Antonio',
+          },
+        ],
+      });
+    });
+
     test('$keyBy:{ $pick }', () => {
       const sut = aggio<{ name: string }>(users, [
         { $keyBy: { $pick: 'name' } },
@@ -66,7 +136,7 @@ describe('DB', () => {
     });
 
     test('$keyBy:{ $pick: `field.subField` }', () => {
-      const sut = aggio<{ name: string; address?: { street: string } }>(
+      const sut = aggio<UserWithAddress>(
         [
           {
             name: 'Antonio',
@@ -93,14 +163,12 @@ describe('DB', () => {
 
       expect(sut).toEqual({
         'rafaela#avenida': {
-          _id: expect.any(String),
           address: {
             street: 'Avenida',
           },
           name: 'Rafaela',
         },
         'antonio#rua': {
-          _id: expect.any(String),
           address: {
             street: 'Rua',
           },
@@ -142,14 +210,12 @@ describe('DB', () => {
 
       expect(sut).toEqual({
         'ANTONIO#rua': {
-          _id: expect.any(String),
           address: {
             street: 'Rua',
           },
           name: 'Antonio',
         },
         'RAFAELA#avenida': {
-          _id: expect.any(String),
           address: {
             street: 'Avenida',
           },
@@ -185,19 +251,16 @@ describe('DB', () => {
       expect(sut).toEqual({
         Antonio: [
           {
-            _id: expect.any(String),
             age: 55,
             name: 'Antonio',
           },
           {
-            _id: expect.any(String),
             age: 20,
             name: 'Antonio',
           },
         ],
         Rafaela: [
           {
-            _id: expect.any(String),
             age: 20,
             name: 'Rafaela',
           },
@@ -385,6 +448,15 @@ describe('DB', () => {
 ```
 
 ```typescript
+export type AggregationOperatorKeys = typeof aggregationOperatorKeys.enum;
+
+export type Aggregation<TSchema> = AggregationOperator<TSchema>[];
+
+export type AggregationOperatorKey = AggregationOperator<any> extends infer R
+  ? R extends unknown
+    ? keyof R
+    : never
+  : never;
 
 export type TemplateDefinition = { $template: string; options?: TemplateOptions };
 export type StringifyDefinition = keyof typeof stringCase | TemplateDefinition;
@@ -411,22 +483,28 @@ export type AggregationOperator<TSchema> =
   | PickDefinition<TSchema>
   | TemplateDefinition;
 
-export type GroupByDefinition<TSchema> = {
-  [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
-    ? Property
-    : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
-};
-
-export type KeyByDefinition<TSchema extends any = { _id?: string }> = (
+export type GroupByDefinition<TSchema> =
   | {
       [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends number | string
         ? Property
         : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
     }
-  | PickDefinition<TSchema>
-) & {
-  $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
-};
+  | Join<NestedPaths<WithId<TSchema>>, '.'>;
+
+export type KeyByDefinition<TSchema extends any = { _id?: string }> =
+  | ((
+      | {
+          [Property in Join<NestedPaths<WithId<TSchema>>, '.'> as PropertyType<TSchema, Property> extends
+            | number
+            | string
+            ? Property
+            : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
+        }
+      | PickDefinition<TSchema>
+    ) & {
+      $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
+    })
+  | Join<NestedPaths<WithId<TSchema>>, '.'>;
 
 // Some Types from The official MongoDB driver for Node.js
 export type Query<TSchema = TDocument> =
@@ -654,6 +732,7 @@ export type Sort =
 export type SortDirection = 1 | -1 | 'asc' | 'desc' | 'ascending' | 'descending';
 
 ```
+
 ## License
 
 See [License](LICENSE)

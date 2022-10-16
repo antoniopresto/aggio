@@ -1,6 +1,6 @@
 import { Hope } from 'hoper';
 
-import { Query, TDocument } from './Operations';
+import { Query, Sort, TDocument } from './Operations';
 import { SyncStorage } from './createSyncStorage';
 
 export * from './Operations';
@@ -52,7 +52,7 @@ export interface Cursor<Doc> extends Hope<Doc> {
   exec(): Promise<Doc>;
   skip(value: number): Cursor<Doc>;
   limit(value: number): Cursor<Doc>;
-  sort(doc: { [K: string]: 1 | -1 }): Cursor<Doc>;
+  sort(doc: Sort): Cursor<Doc>;
 }
 
 export type DocInput<Doc extends TDocument = TDocument> = {
