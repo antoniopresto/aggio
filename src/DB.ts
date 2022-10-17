@@ -11,6 +11,7 @@ import customUtils from './customUtils';
 import { Index } from './indexes';
 import {
   Aggregation,
+  AggregationOperator,
   CountCallback,
   DBOptions,
   DocInput,
@@ -144,8 +145,8 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
 
     Object.keys(this.indexes).forEach(function (i, index) {
       newData = newData?.map((el) => {
+        el = clone(el);
         if (!el._id) {
-          el = clone(el);
           el._id = self.createNewId();
         }
         return el;
@@ -747,7 +748,12 @@ export type AggioOptions = {
 
 export function aggio<Doc extends TDocument>(
   input: DB<Doc> | DBOptions<Doc> | Doc[] | Readonly<DB<Doc> | DBOptions<Doc> | Doc[]>,
-  aggregation: Aggregation<Doc> | Aggregation<any>,
+  aggregation:
+    | AggregationOperator<Doc>
+    | AggregationOperator<any>
+    | Aggregation<Doc>
+    | Aggregation<any>
+    | Readonly<AggregationOperator<Doc> | AggregationOperator<any> | Aggregation<Doc> | Aggregation<any>>,
   options: AggioOptions = {}
 ) {
   const { excludeId = true } = options;
@@ -759,7 +765,11 @@ export function aggio<Doc extends TDocument>(
       ? createDB({ docs: input })
       : createDB(input as any);
 
-  const operations = (aggregation as Aggregation<{ [K: string]: string }>).map((operation) => getEntry(operation));
+  const _aggregation = (Array.isArray(aggregation) ? aggregation : [aggregation]) as Aggregation<{
+    [K: string]: string;
+  }>;
+
+  const operations = _aggregation.map((operation) => getEntry(operation));
   const ops: { op: typeof operations[number]; res: any }[] = [];
 
   function getKeyValue(item: TDocument, key: string | number) {
@@ -857,9 +867,7 @@ export function aggio<Doc extends TDocument>(
         const item = findOne(op.value).exec();
 
         ops.push({ res: item, op });
-        if (item) {
-          db.resetIndexes([item]);
-        }
+        db.resetIndexes(item ? [item] : []);
         break;
       }
       case '$sort': {
@@ -904,11 +912,11 @@ export function aggio<Doc extends TDocument>(
             .project({ [key]: 1 })
             .exec();
 
-          if (item) {
-            db.resetIndexes([item]);
-          }
           const res = item ? getKeyValue(item, key) : item;
-          ops.push({ res, op });
+          const items = Array.isArray(res) ? res : !isNullish(res) ? [res] : [];
+
+          ops.push({ res: items[0], op });
+          db.resetIndexes(items.filter((el) => el && typeof el == 'object'));
           break;
         }
 
@@ -1023,30 +1031,38 @@ export function aggio<Doc extends TDocument>(
         const _op = { ..._value };
         delete _op.$onMany;
 
-        const { key, value } = getEntry(_op);
+        const entry = getEntry(_op);
 
         const query = { ..._value };
         // @ts-ignore
         delete query.$pick;
+        // @ts-ignore
+        delete query.$template;
         delete query.$onMany;
+
         const items = find(query).sort(lastSort).exec();
 
-        assertObjectKey(key);
+        assertObjectKey(entry.key);
 
         items.forEach((el) => {
           let keyValue: string;
 
-          switch (key as string) {
-            case '$pick': {
-              const picked = aggio([el], [{ $pick: value! }], options);
+          switch (entry.key as string) {
+            case '$pick':
+            case '$template': {
+              const picked = aggio(
+                [el],
+                [{ [entry.key]: entry.original[entry.key]! } as any, { $first: true }],
+                options
+              );
               if (isNullish(picked)) return; // Not include nulls
               keyValue = assertObjectKey(picked, (tof) => {
-                return `expected $pick result to be of type string found ${tof} - Operation:${JSON.stringify(op)}`;
+                return `expected ${entry.key} result to be of type string found ${tof}}`;
               });
               break;
             }
             default: {
-              keyValue = assertObjectKey(getKeyValue(el, key));
+              keyValue = assertObjectKey(getKeyValue(el, entry.key));
             }
           }
 
@@ -1102,12 +1118,12 @@ export function aggio<Doc extends TDocument>(
 
   let res = ops[ops.length - 1]?.res;
 
-  if ($first) {
-    res = res?.[0];
+  if ($first && Array.isArray(res)) {
+    res = res[0];
   }
 
-  if ($last) {
-    res = res?.length ? res[res.length - 1] : undefined;
+  if ($last && Array.isArray(res)) {
+    res = res[res.length - 1];
   }
 
   if (!isNaN($limit)) {

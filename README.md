@@ -10,6 +10,7 @@ npm install aggio --save    # Put latest version in your package.json
 
 ```ts
 import { aggio, createDB, DB } from 'aggio';
+
 type UserWithAddress = { name: string; address?: { street: string } };
 
 describe('DB', () => {
@@ -39,7 +40,101 @@ describe('DB', () => {
     },
   ];
 
+  const account = {
+    username: 'antonio',
+    firstName: 'antonio',
+    lastName: 'Silva',
+    access: [
+      {
+        kind: 'email',
+        value: 'antonio@example.com',
+        updatedAt: '2022-10-17T02:09:47.948Z',
+        createdAt: '2022-10-17T02:09:47.948Z',
+        verified: false,
+      },
+      {
+        kind: 'phone',
+        value: '+5511999988888',
+        updatedAt: '2022-10-17T02:09:47.948Z',
+        createdAt: '2022-10-17T02:09:47.948Z',
+        verified: false,
+      },
+    ],
+  };
+
   describe('aggio', () => {
+    test('$groupBy accessKind', () => {
+      const res = aggio(
+        [account],
+        [
+          //
+          { $pick: 'access' },
+          { $groupBy: 'kind' },
+        ]
+      );
+      expect(res).toEqual({
+        email: [
+          {
+            createdAt: '2022-10-17T02:09:47.948Z',
+            kind: 'email',
+            updatedAt: '2022-10-17T02:09:47.948Z',
+            value: 'antonio@example.com',
+            verified: false,
+          },
+        ],
+        phone: [
+          {
+            createdAt: '2022-10-17T02:09:47.948Z',
+            kind: 'phone',
+            updatedAt: '2022-10-17T02:09:47.948Z',
+            value: '+5511999988888',
+            verified: false,
+          },
+        ],
+      });
+    });
+
+    test('$pick email', () => {
+      const res = aggio(
+        [account],
+        [
+          //
+          { $pick: 'access' },
+          { $matchOne: { kind: 'email' } },
+          { $pick: 'value' },
+        ]
+      );
+      expect(res).toEqual('antonio@example.com');
+    });
+
+    test('$keyBy accessKind', () => {
+      const res = aggio(
+        [account],
+        [
+          //
+          { $pick: 'access' },
+          { $keyBy: { $template: '{kind}#{value}' } },
+        ]
+      );
+
+      expect(res).toEqual({
+        'email#antonio@example.com': {
+          createdAt: '2022-10-17T02:09:47.948Z',
+          kind: 'email',
+          updatedAt: '2022-10-17T02:09:47.948Z',
+          value: 'antonio@example.com',
+          verified: false,
+        },
+        'phone#+5511999988888': {
+          createdAt: '2022-10-17T02:09:47.948Z',
+          kind: 'phone',
+          updatedAt: '2022-10-17T02:09:47.948Z',
+          value: '+5511999988888',
+          verified: false,
+        },
+      });
+    });
+
     test('$matchOne', () => {
       const sut = aggio(users, [{ $matchOne: { name: 'Antonio' } }]);
       expect(sut).toMatchObject(Antonio);
@@ -64,7 +159,7 @@ describe('DB', () => {
         [
           { $sort: { name: -1 } }, //
           { $template: '{name}#{lowercase(address.street)}' },
-          { $first: 1 },
+          { $first: true },
           { $limit: 10 },
         ]
       );
@@ -730,7 +825,6 @@ export type Sort =
   | [string, SortDirection];
 
 export type SortDirection = 1 | -1 | 'asc' | 'desc' | 'ascending' | 'descending';
-
 ```
 
 ## License

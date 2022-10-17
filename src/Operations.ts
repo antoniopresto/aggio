@@ -70,8 +70,8 @@ export type PickDefinition<TSchema> = {
 };
 
 export type AggregationOperator<TSchema> =
-  | { $first: true | 1 }
-  | { $last: true | 1 }
+  | { $first: true }
+  | { $last: true }
   | { $update: UpdateDefinition<TSchema> & { $match?: Query<TSchema>; $multi?: boolean; $upsert?: boolean } }
   | { $matchOne: Query<TSchema> }
   | { $limit: number }
@@ -101,6 +101,7 @@ export type KeyByDefinition<TSchema extends any = { _id?: string }> =
             : never]?: PropertyType<WithId<TSchema>, Property> | Condition<PropertyType<WithId<TSchema>, Property>>;
         }
       | PickDefinition<TSchema>
+      | TemplateDefinition
     ) & {
       $onMany?: 'first' | 'last' | 'error' | 'warn' | 'list';
     })
