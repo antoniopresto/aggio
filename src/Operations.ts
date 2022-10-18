@@ -10,7 +10,12 @@ export const objectModifies = tupleEnum(
   '$pull',
   '$inc',
   '$max',
-  '$min'
+  '$min',
+
+  // aggio specific
+  '$prepend',
+  '$unshift', // alias to prepend
+  '$setIfNull'
 );
 
 export const comparisonOperatorsEnum = tupleEnum(
@@ -206,6 +211,11 @@ export declare type UpdateDefinition<TSchema> = {
   $pop?: OnlyFieldsOfType<TSchema, ReadonlyArray<any>, 1 | -1>;
   $pull?: PullOperator<TSchema>;
   $push?: PushOperator<TSchema>;
+
+  // aggio specific
+  $setIfNull?: MatchKeysAndValues<TSchema>;
+  $prepend?: PushOperator<TSchema>;
+  $unshift?: PushOperator<TSchema>; // alias to $prepend
 } & TDocument;
 
 export type OnlyFieldsOfType<TSchema, FieldType = any, AssignableType = FieldType> = IfAny<

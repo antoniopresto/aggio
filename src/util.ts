@@ -23,6 +23,10 @@ export function isDate(obj) {
   return Object.prototype.toString.call(obj) === '[object Date]';
 }
 
+export function isNullOrUndefined(value) {
+  return value === null || value === undefined;
+}
+
 export function isRegExp(obj) {
   return Object.prototype.toString.call(obj) === '[object RegExp]';
 }

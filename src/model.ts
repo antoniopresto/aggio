@@ -13,7 +13,7 @@ import map from 'underscore/modules/map';
 import uniq from 'underscore/modules/uniq';
 
 import { ComparisonOperator } from './Operations';
-import { isDate, isRegExp } from './util';
+import { isDate, isNullOrUndefined, isRegExp } from './util';
 
 /**
  * Handle models (i.e. docs)
@@ -314,6 +314,15 @@ lastStepModifierFunctions.$set = function (obj, field, value) {
 };
 
 /**
+ * Set a field if the current value is null or missing
+ */
+lastStepModifierFunctions.$setIfNull = function (obj, field, value) {
+  if (isNullOrUndefined(obj[field])) {
+    obj[field] = value;
+  }
+};
+
+/**
  * Unset a field
  */
 lastStepModifierFunctions.$unset = function (obj, field, value) {
@@ -324,7 +333,7 @@ lastStepModifierFunctions.$unset = function (obj, field, value) {
  * Push an element to the end of an array field
  * Optional modifier $each instead of value to push several values
  * Optional modifier $slice to slice the resulting array, see https://docs.mongodb.org/manual/reference/operator/update/slice/
- * Différeence with MongoDB: if $slice is specified and not $each, we act as if value is an empty array
+ * Diference with MongoDB: if $slice is specified and not $each, we act as if value is an empty array
  */
 lastStepModifierFunctions.$push = function (obj, field, value) {
   // Create the array if it doesn't exist
@@ -375,6 +384,66 @@ lastStepModifierFunctions.$push = function (obj, field, value) {
     obj[field].push(value);
   }
 };
+
+/**
+ * Push an element to the start of an array field
+ * Optional modifier $each instead of value to push several values
+ * Optional modifier $slice to slice the resulting array, see https://docs.mongodb.org/manual/reference/operator/update/slice/
+ * Diference with MongoDB: if $slice is specified and not $each, we act as if value is an empty array
+ */
+lastStepModifierFunctions.$prepend = function (obj, field, value) {
+  // Create the array if it doesn't exist
+  if (!obj.hasOwnProperty(field)) {
+    obj[field] = [] as any[];
+  }
+
+  if (!Array.isArray(obj[field])) {
+    throw new Error("Can't $append an element on non-array values");
+  }
+
+  if (value !== null && typeof value === 'object' && value.$slice && value.$each === undefined) {
+    value.$each = [] as any[];
+  }
+
+  const hasEach = value !== null && typeof value === 'object' && value.$each;
+
+  if (!hasEach) {
+    obj[field].unshift(value);
+    return;
+  }
+
+  if (Object.keys(value).length >= 3 || (Object.keys(value).length === 2 && value.$slice === undefined)) {
+    throw new Error('Can only use $slice in conjunction with $each when $append to array');
+  }
+  if (!Array.isArray(value.$each)) {
+    throw new Error('$each requires an array value');
+  }
+
+  value.$each.forEach(function (v) {
+    obj[field].unshift(v);
+  });
+
+  if (value.$slice === undefined || typeof value.$slice !== 'number') {
+    return;
+  }
+
+  if (value.$slice === 0) {
+    obj[field] = [] as any[];
+  } else {
+    let start,
+      end,
+      n = obj[field].length;
+    if (value.$slice < 0) {
+      start = Math.max(0, n + value.$slice);
+      end = n;
+    } else if (value.$slice > 0) {
+      start = 0;
+      end = Math.min(n, value.$slice);
+    }
+    obj[field] = obj[field].slice(start, end);
+  }
+};
+lastStepModifierFunctions.$unshift = lastStepModifierFunctions.$prepend;
 
 /**
  * Add an element to an array field only if it is not already in it

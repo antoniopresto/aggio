@@ -1,12 +1,12 @@
 import { aggio, createDB, DB } from '../DB';
 
-type UserWithAddress = { name: string; address?: { street: string } };
+type UserWithAddress = {
+  name: string;
+  address?: { street: string; zip?: string; number?: number | null | undefined };
+  addressList?: { street: string; zip?: string; number?: number | null | undefined }[];
+};
 
 describe('DB', () => {
-  let db: DB<{ name: string }>;
-
-  beforeEach(async () => (db = createDB()));
-
   const Antonio = { name: 'Antonio' };
   const Rafaela = { name: 'Rafaela' };
   const users = [Antonio, Rafaela];
@@ -475,6 +475,10 @@ describe('DB', () => {
   });
 
   describe('DB methods', () => {
+    let db: DB<UserWithAddress>;
+
+    beforeEach(async () => (db = createDB()));
+
     test('db.insert', async () => {
       const sut = db.insert(users);
 
@@ -526,6 +530,138 @@ describe('DB', () => {
       db.insert(users);
       const sut = db.remove({ name: /ant/i });
       expect(sut).toEqual(1);
+    });
+
+    // methods added in db but not in nedb
+    describe('update (new methods)', () => {
+      describe('$setIfNull', () => {
+        //
+        test('not set on not null', () => {
+          db.insert(usersWithAddress);
+          const sut = db.update({ name: /^ant/i }, { $setIfNull: { name: 'NewName' } });
+          expect(sut).toHaveProperty('updated.name', 'Antonio');
+        });
+
+        test('set on null', () => {
+          db.insert(usersWithAddress);
+
+          const update1 = db.update({ name: /^ant/i }, { $set: { 'address.number': null } });
+          expect(update1).toHaveProperty('updated.address.number', null);
+
+          const sut = db.update({ name: /^ant/i }, { $setIfNull: { 'address.number': 2 } });
+          expect(sut).toHaveProperty('updated.address.number', 2);
+        });
+
+        test('set on undefined', () => {
+          db.insert(usersWithAddress);
+
+          const update1 = db.update({ name: /^ant/i }, { $set: { 'address.number': undefined } });
+          expect(update1).toHaveProperty('updated.address.number', undefined);
+
+          const sut = db.update({ name: /^ant/i }, { $setIfNull: { 'address.number': 2 } });
+          expect(sut).toHaveProperty('updated.address.number', 2);
+        });
+
+        test('set on array item', () => {
+          db.insert(usersWithAddress);
+
+          const update1 = db.update(
+            { name: /^ant/i },
+            {
+              $addToSet: {
+                addressList: {
+                  street: 'fighter',
+                },
+              },
+            }
+          );
+
+          expect(update1).toHaveProperty('updated.addressList', [{ street: 'fighter' }]);
+
+          const sut = db.update(
+            { name: /^ant/i, 'addressList.street': 'fighter' },
+            { $setIfNull: { 'addressList.0.zip': '18120000' } }
+          );
+
+          expect(sut).toHaveProperty('updated.addressList.0.zip', '18120000');
+
+          const update2 = db.update(
+            { name: /^ant/i, 'addressList.street': 'fighter' },
+            { $setIfNull: { 'addressList.0.zip': '5555555' } }
+          );
+
+          expect(update2).toHaveProperty('updated.addressList.0.zip', '18120000');
+        });
+      });
+
+      describe('$prepend', () => {
+        //
+        test('not set on not null', () => {
+          db.insert(usersWithAddress);
+
+          db.update({ name: /^ant/i }, { $set: { addressList: [{ street: '3' }] } });
+          db.update({ name: /^ant/i }, { $prepend: { addressList: { street: '2' } } });
+          db.update({ name: /^ant/i }, { $push: { addressList: { street: '4' } } });
+
+          const sut = db.update(
+            { name: /^ant/i },
+            {
+              // unshift is an alias
+              $unshift: {
+                addressList: { street: '1' },
+              },
+            }
+          );
+
+          expect(sut.updated?.addressList).toEqual([
+            {
+              street: '1',
+            },
+            {
+              street: '2',
+            },
+            {
+              street: '3',
+            },
+            {
+              street: '4',
+            },
+          ]);
+        });
+
+        test('set on null', () => {
+          db.insert(usersWithAddress);
+
+          db.update({ name: /^ant/i }, { $prepend: { addressList: { street: '3' } } });
+          db.update({ name: /^ant/i }, { $prepend: { addressList: { street: '2' } } });
+          db.update({ name: /^ant/i }, { $push: { addressList: { street: '4' } } });
+
+          const sut = db.update(
+            { name: /^ant/i },
+            {
+              // unshift is an alias
+              $unshift: {
+                addressList: { street: '1' },
+              },
+            }
+          );
+
+          expect(sut.updated?.addressList).toEqual([
+            {
+              street: '1',
+            },
+            {
+              street: '2',
+            },
+            {
+              street: '3',
+            },
+            {
+              street: '4',
+            },
+          ]);
+        });
+      });
     });
   });
 });
