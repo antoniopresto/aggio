@@ -230,7 +230,7 @@ export type AcceptedFields<TSchema, FieldType, AssignableType> = {
   readonly [key in KeysOfAType<TSchema, FieldType>]?: AssignableType;
 };
 
-type KeysOfAType<TSchema, Type> = {
+export type KeysOfAType<TSchema, Type> = {
   [key in keyof TSchema]: NonNullable<TSchema[key]> extends Type ? key : never;
 }[keyof TSchema];
 
