@@ -662,6 +662,65 @@ describe('DB', () => {
           ]);
         });
       });
+
+      describe('$remove', () => {
+        //
+        test('not set on not null', () => {
+          db.insert(usersWithAddress);
+
+          db.update({ name: /^ant/i }, { $set: { addressList: [{ street: '3', number: 1 }] } });
+
+          const sut = db.update(
+            { name: /^ant/i },
+            {
+              $unset: {
+                // name: true,
+                'addressList.0.street': true,
+              },
+            }
+          );
+
+          expect(sut.updated).toEqual({
+            _id: expect.any(String),
+            address: {
+              street: 'Rua',
+            },
+            addressList: [
+              {
+                number: 1,
+              },
+            ],
+            name: 'Antonio',
+          });
+        });
+      });
+
+      describe('$pull $in', () => {
+        //
+        test('not set on not null', () => {
+          db.insert(usersWithAddress);
+
+          db.update({ name: /^ant/i }, { $set: { addressList: [{ street: '3', number: 1 }] } });
+
+          const sut = db.update(
+            { name: /^ant/i },
+            {
+              $pull: {
+                addressList: { $in: [{ street: '3', number: 1 }] },
+              },
+            }
+          );
+
+          expect(sut.updated).toEqual({
+            _id: expect.any(String),
+            address: {
+              street: 'Rua',
+            },
+            addressList: [],
+            name: 'Antonio',
+          });
+        });
+      });
     });
   });
 });

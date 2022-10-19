@@ -516,10 +516,23 @@ lastStepModifierFunctions.$pull = function (obj, field, value) {
     throw new Error("Can't $pull an element from non-array values");
   }
 
-  arr = obj[field];
-  for (i = arr.length - 1; i >= 0; i -= 1) {
-    if (match(arr[i], value)) {
-      arr.splice(i, 1);
+  if (value !== null && typeof value === 'object' && value.$in) {
+    if (Object.keys(value).length > 1) {
+      throw new Error("Can't use another field in conjunction with $in");
+    }
+    if (!Array.isArray(value.$in)) {
+      throw new Error('$in requires an array value');
+    }
+
+    value.$in.forEach(function (v) {
+      lastStepModifierFunctions.$pull(obj, field, v);
+    });
+  } else {
+    arr = obj[field];
+    for (i = arr.length - 1; i >= 0; i -= 1) {
+      if (match(arr[i], value)) {
+        arr.splice(i, 1);
+      }
     }
   }
 };

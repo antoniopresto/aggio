@@ -63,7 +63,7 @@ export type AggregationOperatorKey = AggregationOperator<any> extends infer R
     : never
   : never;
 
-export type TemplateDefinition = { $template: string; options?: TemplateOptions };
+export type TemplateDefinition = { $template: string } & Partial<TemplateOptions>;
 export type StringifyDefinition = keyof typeof stringCase | TemplateDefinition;
 
 export type PickDefinition<TSchema> = {

@@ -1148,11 +1148,13 @@ function _updateOptions(): Required<UpdateOptions> {
 function _stringify(input: { template: TemplateDefinition; doc: Record<string, any>; value: any }) {
   const { template: $template, doc, value } = input;
 
+  const { $template: _, ...options } = $template;
+
   const executor = template($template.$template, {
-    ...$template.options,
+    ...options,
     imports: {
       ...templateUtils,
-      ...$template.options?.imports,
+      ...options.imports,
     },
   });
 
