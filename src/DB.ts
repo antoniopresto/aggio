@@ -613,7 +613,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
                 // updateQuery contains modifiers, use the find query as the base,
                 // strip it from all operators and update it according to updateQuery
                 try {
-                  toBeInserted = model.modify(model.deepCopy(query, true), updateQuery);
+                  toBeInserted = model.modify(model.deepCopy(query, true), updateQuery, query);
                 } catch (err: any) {
                   return callback(err);
                 }
@@ -649,7 +649,8 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
                   if (self.timestampData) {
                     createdAt = candidates[i].createdAt;
                   }
-                  modifiedDoc = model.modify(candidates[i], updateQuery);
+                  modifiedDoc = _arrayPositionalUpdates({ query, updateQuery, candidate: candidates[i] });
+                  modifiedDoc = model.modify(modifiedDoc, updateQuery, query);
                   if (self.timestampData) {
                     modifiedDoc.createdAt = createdAt;
                     modifiedDoc.updatedAt = new Date();
@@ -1164,4 +1165,63 @@ function _stringify(input: { template: TemplateDefinition; doc: Record<string, a
       : { $value: value, $doc: doc };
 
   return executor(data);
+}
+
+function _arrayPositionalUpdates(input: {
+  candidate: Record<string, any>;
+  query: Record<string, any>;
+  updateQuery: Record<string, any>;
+}) {
+  const { updateQuery, query, candidate } = input;
+
+  const newDoc = model.deepCopy(candidate);
+
+  const queryEntries = Object.entries(query);
+  const updateEntries = Object.entries(updateQuery);
+
+  updateEntries.forEach(([updateMethod, updateMethodQuery]) => {
+    if (!updateMethod.startsWith('$')) return;
+    if (!updateMethodQuery || typeof updateMethodQuery !== 'object') return;
+
+    Object.entries(updateMethodQuery).forEach(([updateKey, updateValue]) => {
+      const updateParts = updateKey.split('.$.');
+
+      // handling simple positional array updates only accepts one
+      //    level like 'access.value' in filter and 'access.$.value' in update
+      if (updateParts.length !== 2) {
+        throw new Error(`Not supported array update using "${updateKey}"`);
+      }
+
+      const arrayField = updateParts[0];
+      const arrayUpdatePart = { [updateMethod]: { [updateParts[1]]: updateValue } };
+
+      // deleting the filter because the next calls to model.update will check against '$' characters
+      delete updateQuery[updateMethod][updateKey];
+
+      if (!Array.isArray(newDoc[arrayField])) return;
+
+      const valuesInQuery: Record<string, any>[] = [];
+
+      queryEntries.forEach(([key, filterValue]) => {
+        const queryParts = key.split('.');
+        const [start, ...rest] = queryParts;
+        if (start !== arrayField) return;
+        const arrayCondition = rest.join('.');
+        valuesInQuery.push({ [arrayCondition]: filterValue });
+      });
+
+      if (!valuesInQuery.length) {
+        throw new Error(`No filter provided to update array "${arrayField}" using "${updateKey}"`);
+      }
+
+      valuesInQuery.forEach((filter) => {
+        newDoc[arrayField].forEach((doc, index) => {
+          if (!model.match(doc, filter)) return;
+          newDoc[arrayField][index] = model.modify(doc, arrayUpdatePart, filter);
+        });
+      });
+    });
+  });
+
+  return newDoc;
 }

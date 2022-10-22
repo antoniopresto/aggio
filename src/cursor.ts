@@ -94,14 +94,14 @@ export class Cursor<Doc extends TDocument = TDocument, ExecResult = any> {
             delete toPush.$set[k];
           }
         });
-        toPush = model.modify({}, toPush);
+        toPush = model.modify({}, toPush, self.query);
       } else {
         // omit-type projection
         toPush = { $unset: {} };
         keys.forEach(function (k) {
           toPush.$unset[k] = true;
         });
-        toPush = model.modify(candidate, toPush);
+        toPush = model.modify(candidate, toPush, self.query);
       }
       if (keepId) {
         toPush._id = candidate._id;

@@ -605,7 +605,7 @@ Object.keys(lastStepModifierFunctions).forEach(function (modifier) {
 /**
  * Modify a DB object according to an update query
  */
-function modify(obj, updateQuery) {
+function modify(obj, updateQuery, _findQuery) {
   let keys = Object.keys(updateQuery),
     firstChars = map(keys, function (item) {
       return item[0];
@@ -979,7 +979,7 @@ logicalOperators.$where = function (obj, fn) {
  * @param {Object} obj Document to check
  * @param {Object} query
  */
-function match(obj, query) {
+function match(obj, query): boolean {
   let queryKeys, queryKey, queryValue, i;
 
   // Primitive query against a primitive type
@@ -1016,7 +1016,7 @@ function match(obj, query) {
  * Match an object against a specific { key: value } part of a query
  * if the treatObjAsValue flag is set, don't try to match every part separately, but the array as a whole
  */
-function matchQueryPart(obj, queryKey, queryValue, treatObjAsValue?) {
+function matchQueryPart(obj, queryKey, queryValue, treatObjAsValue?): boolean {
   let objValue = getDotValue(obj, queryKey),
     i,
     keys,
