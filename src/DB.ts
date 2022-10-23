@@ -1176,9 +1176,32 @@ function _arrayPositionalUpdates(input: {
 
   const newDoc = model.deepCopy(candidate);
 
-  const queryEntries = Object.entries(query);
   const updateEntries = Object.entries(updateQuery);
 
+  function _valuesInQuery(parentField: string, query: Record<string, any>) {
+    const queryEntries = Object.entries(query);
+    const valuesInQuery: Record<string, any>[] = [];
+    
+    queryEntries.forEach(([key, filterValue]) => {
+      if (key === '$and' || key === '$or') {
+        return filterValue.forEach((subQuery) => {
+          valuesInQuery.push(..._valuesInQuery(parentField, subQuery));
+        });
+      }
+      if (key.startsWith('$')) {
+        throw new Error(`Invalid operator "${key}" used during positional array update`);
+      }
+      
+      const queryParts = key.split('.');
+      const [start, ...rest] = queryParts;
+      if (start !== parentField) return;
+      const arrayCondition = rest.join('.');
+      valuesInQuery.push({ [arrayCondition]: filterValue });
+    });
+    
+    return valuesInQuery;
+  }
+  
   updateEntries.forEach(([updateMethod, updateMethodQuery]) => {
     if (!updateMethod.startsWith('$')) return;
     if (!updateMethodQuery || typeof updateMethodQuery !== 'object') return;
@@ -1201,15 +1224,7 @@ function _arrayPositionalUpdates(input: {
 
       if (!Array.isArray(newDoc[arrayField])) return;
 
-      const valuesInQuery: Record<string, any>[] = [];
-
-      queryEntries.forEach(([key, filterValue]) => {
-        const queryParts = key.split('.');
-        const [start, ...rest] = queryParts;
-        if (start !== arrayField) return;
-        const arrayCondition = rest.join('.');
-        valuesInQuery.push({ [arrayCondition]: filterValue });
-      });
+      const valuesInQuery = _valuesInQuery(arrayField, query);
 
       if (!valuesInQuery.length) {
         throw new Error(`No filter provided to update array "${arrayField}" using "${updateKey}"`);

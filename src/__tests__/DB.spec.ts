@@ -536,7 +536,7 @@ describe('DB', () => {
     describe('update (new methods)', () => {
       let db: DB<UserWithAddress>;
       beforeEach(() => (db = createDB()));
-  
+
       describe('$setIfNull', () => {
         test('not set on not null', () => {
           db.insert(usersWithAddress);
@@ -598,6 +598,34 @@ describe('DB', () => {
 
       describe('$set by array position', () => {
         let db: DB<typeof account> = createDB();
+
+        test('set using $and', () => {
+          const original = db.insert(account);
+
+          const update1 = db.update(
+            {
+              $and: [{ $or: [{ $and: [{ 'access.kind': 'email' }] }] }],
+            },
+            {
+              $set: {
+                'access.$.value': '5511949999999',
+                'access.$.kind': 'phone',
+              },
+            }
+          );
+
+          expect(update1.updated).toEqual({
+            ...original,
+            access: [
+              {
+                ...original.access[0],
+                value: '5511949999999',
+                kind: 'phone',
+              },
+              original.access[1],
+            ],
+          });
+        });
 
         test('set on array item', () => {
           const original = db.insert(account);
