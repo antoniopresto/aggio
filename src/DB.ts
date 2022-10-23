@@ -1185,6 +1185,7 @@ function _arrayPositionalUpdates(input: {
 
     Object.entries(updateMethodQuery).forEach(([updateKey, updateValue]) => {
       const updateParts = updateKey.split('.$.');
+      if (updateParts.length === 1) return;
 
       // handling simple positional array updates only accepts one
       //    level like 'access.value' in filter and 'access.$.value' in update

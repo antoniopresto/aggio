@@ -534,8 +534,10 @@ describe('DB', () => {
 
     // methods added in db but not in nedb
     describe('update (new methods)', () => {
+      let db: DB<UserWithAddress>;
+      beforeEach(() => (db = createDB()));
+  
       describe('$setIfNull', () => {
-        //
         test('not set on not null', () => {
           db.insert(usersWithAddress);
           const sut = db.update({ name: /^ant/i }, { $setIfNull: { name: 'NewName' } });
@@ -623,6 +625,7 @@ describe('DB', () => {
           });
         });
 
+        // FIXME
         xtest('update entire array item', () => {
           const original = db.insert(account);
 
@@ -652,7 +655,6 @@ describe('DB', () => {
       });
 
       describe('$prepend', () => {
-        //
         test('not set on not null', () => {
           db.insert(usersWithAddress);
 
@@ -753,7 +755,6 @@ describe('DB', () => {
       });
 
       describe('$pull $in', () => {
-        //
         test('not set on not null', () => {
           db.insert(usersWithAddress);
 

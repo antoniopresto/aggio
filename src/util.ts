@@ -39,13 +39,14 @@ export function promiseWaterfall<T, CB extends (payload: T) => Promise<T>>(callb
 }
 
 export function maybePromise(self: { sync: boolean }, args: any[], execute: Function) {
+  const { sync } = self;
   const lastType = typeof args[args.length - 1];
   const callbackFromArgs = ['function', 'undefined'].includes(lastType) ? args.pop() : undefined;
 
   let payload;
 
   function callback(err, result) {
-    if (!callbackFromArgs && err) throw err;
+    if (sync && err) throw err;
     payload = result;
     callbackFromArgs?.(err, result);
   }
