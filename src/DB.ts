@@ -1,9 +1,9 @@
 import util from 'util';
 
 import async from 'async';
-import clone from 'underscore/modules/clone';
-import intersection from 'underscore/modules/intersection';
-import pluck from 'underscore/modules/pluck';
+import clone from 'underscore/cjs/clone';
+import intersection from 'underscore/cjs/intersection';
+import pluck from 'underscore/cjs/pluck';
 
 import { createSyncStorage } from './createSyncStorage';
 import { Cursor } from './cursor';
@@ -1181,7 +1181,7 @@ function _arrayPositionalUpdates(input: {
   function _valuesInQuery(parentField: string, query: Record<string, any>) {
     const queryEntries = Object.entries(query);
     const valuesInQuery: Record<string, any>[] = [];
-    
+
     queryEntries.forEach(([key, filterValue]) => {
       if (key === '$and' || key === '$or') {
         return filterValue.forEach((subQuery) => {
@@ -1191,17 +1191,17 @@ function _arrayPositionalUpdates(input: {
       if (key.startsWith('$')) {
         throw new Error(`Invalid operator "${key}" used during positional array update`);
       }
-      
+
       const queryParts = key.split('.');
       const [start, ...rest] = queryParts;
       if (start !== parentField) return;
       const arrayCondition = rest.join('.');
       valuesInQuery.push({ [arrayCondition]: filterValue });
     });
-    
+
     return valuesInQuery;
   }
-  
+
   updateEntries.forEach(([updateMethod, updateMethodQuery]) => {
     if (!updateMethod.startsWith('$')) return;
     if (!updateMethodQuery || typeof updateMethodQuery !== 'object') return;

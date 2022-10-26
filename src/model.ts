@@ -5,12 +5,12 @@
  * Querying, update
  */
 
-import filter from 'underscore/modules/filter';
-import has from 'underscore/modules/has';
-import isBoolean from 'underscore/modules/isBoolean';
-import isFunction from 'underscore/modules/isFunction';
-import map from 'underscore/modules/map';
-import uniq from 'underscore/modules/uniq';
+import filter from 'underscore/cjs/filter';
+import has from 'underscore/cjs/has';
+import isBoolean from 'underscore/cjs/isBoolean';
+import isFunction from 'underscore/cjs/isFunction';
+import map from 'underscore/cjs/map';
+import uniq from 'underscore/cjs/uniq';
 
 import { ComparisonOperator } from './Operations';
 import { isDate, isNullOrUndefined, isRegExp } from './util';

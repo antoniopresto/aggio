@@ -1,7 +1,7 @@
 /**
  * Manage access to data, be it to find, update or remove it
  */
-import omit from 'underscore/modules/omit';
+import omit from 'underscore/cjs/omit';
 
 import { DB } from './DB';
 import { Query, Sort, TDocument } from './Operations';
