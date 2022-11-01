@@ -1,7 +1,7 @@
 import util from 'util';
 
 import { AVLTree as BinarySearchTree } from 'binary-search-tree';
-import uniq from 'underscore/cjs/uniq';
+import { uniq } from 'underscore';
 
 import model from './model';
 

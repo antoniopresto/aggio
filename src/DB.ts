@@ -1,9 +1,7 @@
 import util from 'util';
 
 import async from 'async';
-import clone from 'underscore/cjs/clone';
-import intersection from 'underscore/cjs/intersection';
-import pluck from 'underscore/cjs/pluck';
+import { clone, intersection, pluck } from 'underscore';
 
 import { createSyncStorage } from './createSyncStorage';
 import { Cursor } from './cursor';
