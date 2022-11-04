@@ -1,6 +1,6 @@
 import util from 'util';
 
-import { AVLTree as BinarySearchTree } from 'binary-search-tree';
+import { AVLTree as BinarySearchTree } from '@verluci/binary-search-tree';
 import { uniq } from 'underscore';
 
 import model from './model';
