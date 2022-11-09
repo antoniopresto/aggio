@@ -42,11 +42,11 @@ function checkKey(k, v) {
     !(k === '$$indexCreated') &&
     !(k === '$$indexRemoved')
   ) {
-    throw new Error('Field names cannot begin with the $ character');
+    throw new Error(`Field name "${k}" cannot begin with the $ character'`);
   }
 
   if (k.indexOf('.') !== -1) {
-    throw new Error('Field names cannot contain a .');
+    throw new Error(`Field name "${k}" cannot contain a .`);
   }
 }
 
