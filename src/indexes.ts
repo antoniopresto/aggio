@@ -1,5 +1,3 @@
-import util from 'util';
-
 import { AVLTree as BinarySearchTree } from 'binary-search-tree';
 import { uniq } from 'underscore';
 
@@ -68,7 +66,7 @@ export class Index {
   insert = (doc) => {
     let key, keys, i, failingI, error;
 
-    if (util.isArray(doc)) {
+    if (Array.isArray(doc)) {
       this.insertMultipleDocs(doc);
       return;
     }
@@ -80,7 +78,7 @@ export class Index {
       return;
     }
 
-    if (!util.isArray(key)) {
+    if (!Array.isArray(key)) {
       this.tree.insert(key, doc);
     } else {
       // If an insert fails due to a unique constraint, roll back all inserts before it
@@ -132,7 +130,7 @@ export class Index {
     let key,
       self = this;
 
-    if (util.isArray(doc)) {
+    if (Array.isArray(doc)) {
       doc.forEach(function (d) {
         self.remove(d);
       });
@@ -145,7 +143,7 @@ export class Index {
       return;
     }
 
-    if (!util.isArray(key)) {
+    if (!Array.isArray(key)) {
       this.tree.delete(key, doc);
     } else {
       uniq(key, projectForUnique).forEach(function (_key) {
@@ -155,7 +153,7 @@ export class Index {
   };
 
   update(oldDoc, newDoc?) {
-    if (util.isArray(oldDoc)) {
+    if (Array.isArray(oldDoc)) {
       this.updateMultipleDocs(oldDoc);
       return;
     }
@@ -204,7 +202,7 @@ export class Index {
   revertUpdate = (oldDoc, newDoc) => {
     let revert = [] as any[];
 
-    if (!util.isArray(oldDoc)) {
+    if (!Array.isArray(oldDoc)) {
       this.update(newDoc, oldDoc);
     } else {
       oldDoc.forEach(function (pair: any) {
@@ -217,7 +215,7 @@ export class Index {
   getMatching = (value) => {
     let self = this;
 
-    if (!util.isArray(value)) {
+    if (!Array.isArray(value)) {
       return self.tree.search(value);
     } else {
       let _res = {},

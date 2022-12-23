@@ -1,11 +1,12 @@
 {
   "name": "aggio",
-  "version": "0.0.114",
+  "version": "0.0.115",
   "typings": "lib",
   "author": "antoniopresto <antoniopresto@gmail.com>",
   "license": "MIT",
   "main": "lib/index.js",
   "module": "lib/module/index.js",
+  "sideEffects": false,
   "browser": {
     "lib/index.js": "./lib/browser/index.js",
     "lib/module/index.js": "./lib/browser/module/index.js"
@@ -17,7 +18,6 @@
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:lint": "eslint src --ext .ts --fix",
     "clear": "rimraf lib",
-    "prepublish": "run-s build fix && run-p test",
     "build:browser": "TARGET=browser npm run babild -- --out-dir lib/browser",
     "build:module-browser": "TARGET=module-browser npm run babild -- --out-dir lib/browser/module",
     "build:node": "TARGET=node npm run babild -- --out-dir lib",

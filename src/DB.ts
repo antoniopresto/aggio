@@ -1,5 +1,3 @@
-import util from 'util';
-
 import async from 'async';
 import { clone, intersection, pluck } from 'underscore';
 
@@ -31,7 +29,7 @@ import {
 } from './interfaces';
 import model from './model';
 import { Persistence } from './persistence';
-import { get, getEntry, isNullish, maybePromise, stringCase, template, templateUtils } from './util';
+import { get, getEntry, isDate, isNullish, maybePromise, stringCase, template, templateUtils } from './util';
 
 function _defaultConfig(): DBOptions {
   return { inMemoryOnly: false, autoload: true, storage: createSyncStorage() as any };
@@ -293,7 +291,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
               typeof query[k] === 'string' ||
               typeof query[k] === 'number' ||
               typeof query[k] === 'boolean' ||
-              util.isDate(query[k]) ||
+              isDate(query[k]) ||
               query[k] === null
             ) {
               usableQueryKeys.push(k);
@@ -350,11 +348,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
           docs.forEach(function (doc) {
             let valid = true;
             ttlIndexesFieldNames.forEach(function (i) {
-              if (
-                doc[i] !== undefined &&
-                util.isDate(doc[i]) &&
-                Date.now() > doc[i].getTime() + self.ttlIndexes[i] * 1000
-              ) {
+              if (doc[i] !== undefined && isDate(doc[i]) && Date.now() > doc[i].getTime() + self.ttlIndexes[i] * 1000) {
                 valid = false;
               }
             });
@@ -464,7 +458,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
         return callback(e);
       }
 
-      this.persistence.persistNewState(util.isArray(preparedDoc) ? preparedDoc : [preparedDoc], function (err) {
+      this.persistence.persistNewState(Array.isArray(preparedDoc) ? preparedDoc : [preparedDoc], function (err) {
         if (err) {
           return callback(err);
         }
