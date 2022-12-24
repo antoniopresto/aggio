@@ -1,7 +1,6 @@
 /**
  * Manage access to data, be it to find, update or remove it
  */
-import { omit } from 'underscore';
 
 import { DB } from './DB';
 import { Query, Sort, TDocument } from './Operations';
@@ -70,8 +69,9 @@ export class Cursor<Doc extends TDocument = TDocument, ExecResult = any> {
       return candidates;
     }
 
-    keepId = this._projection._id === 0 ? false : true;
-    this._projection = omit(this._projection, '_id');
+    keepId = this._projection._id !== 0;
+    const { _id: _excludeId, ...projectionWithoutId } = this._projection;
+    this._projection = projectionWithoutId;
 
     // Check for consistency
     keys = Object.keys(this._projection);

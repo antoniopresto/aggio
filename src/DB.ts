@@ -1,5 +1,6 @@
 import async from 'async';
-import { clone, intersection, pluck } from 'underscore';
+import clone from 'lodash/clone';
+import intersection from 'lodash/intersection';
 
 import { createSyncStorage } from './createSyncStorage';
 import { Cursor } from './cursor';
@@ -623,9 +624,8 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
 
         function () {
           // Perform the update
-          let modifiedDoc,
-            modifications: any = [] as any[],
-            createdAt;
+          let modifiedDoc, createdAt;
+          const modifications: any[] = [];
 
           self.getCandidates(query, function (err, candidates) {
             if (err) {
@@ -665,7 +665,7 @@ export class DB<Doc extends DocInput = DocInput, Opt extends DBOptions = any> im
             }
 
             // Update the datafile
-            let updatedDocs = pluck(modifications, 'newDoc');
+            let updatedDocs = modifications.map((el) => el.newDoc);
             self.persistence.persistNewState(updatedDocs, function (err) {
               if (err) {
                 return callback(err);

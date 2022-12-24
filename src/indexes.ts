@@ -1,6 +1,6 @@
-import { AVLTree as BinarySearchTree } from 'binary-search-tree';
-import { uniq } from 'underscore';
+import uniqBy from 'lodash/unionBy';
 
+import { BinarySearchTree } from './BST';
 import model from './model';
 
 /**
@@ -82,7 +82,7 @@ export class Index {
       this.tree.insert(key, doc);
     } else {
       // If an insert fails due to a unique constraint, roll back all inserts before it
-      keys = uniq(key, projectForUnique);
+      keys = uniqBy(key, projectForUnique);
 
       for (i = 0; i < keys.length; i += 1) {
         try {
@@ -146,7 +146,7 @@ export class Index {
     if (!Array.isArray(key)) {
       this.tree.delete(key, doc);
     } else {
-      uniq(key, projectForUnique).forEach(function (_key) {
+      uniqBy(key, projectForUnique).forEach(function (_key) {
         self.tree.delete(_key, doc);
       });
     }

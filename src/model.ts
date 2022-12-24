@@ -5,8 +5,6 @@
  * Querying, update
  */
 
-import { filter, has, isBoolean, isFunction, map, uniq } from 'underscore';
-
 import { ComparisonOperator } from './Operations';
 import { isDate, isNullOrUndefined, isRegExp } from './util';
 
@@ -210,7 +208,7 @@ function compareArrays(a, b) {
  *
  * @param {Function} _compareStrings String comparing function, returning -1, 0 or 1, overriding default string comparison (useful for languages with accented letters)
  */
-function compareThings(a, b, _compareStrings?) {
+export function compareThings(a, b, _compareStrings?): 0 | 1 | -1 {
   let aKeys,
     bKeys,
     comp,
@@ -541,7 +539,7 @@ lastStepModifierFunctions.$inc = function (obj, field, value) {
   }
 
   if (typeof obj[field] !== 'number') {
-    if (!has(obj, field)) {
+    if (!(field in obj)) {
       obj[field] = value;
     } else {
       throw new Error("Don't use the $inc modifier on non-number fields");
@@ -602,14 +600,13 @@ Object.keys(lastStepModifierFunctions).forEach(function (modifier) {
  */
 function modify(obj, updateQuery, _findQuery) {
   let keys = Object.keys(updateQuery),
-    firstChars = map(keys, function (item) {
+    firstChars = keys.map(function (item) {
       return item[0];
     }),
-    dollarFirstChars = filter(firstChars, function (c) {
+    dollarFirstChars = firstChars.filter(function (c) {
       return c === '$';
     }),
-    newDoc,
-    modifiers;
+    newDoc;
 
   if (keys.indexOf('_id') !== -1 && updateQuery._id !== obj._id) {
     throw new Error("You cannot change a document's _id");
@@ -625,7 +622,7 @@ function modify(obj, updateQuery, _findQuery) {
     newDoc._id = obj._id;
   } else {
     // Apply modifiers
-    modifiers = uniq(keys);
+    const modifiers = [...new Set<string>(keys).values()];
     newDoc = deepCopy(obj);
     modifiers.forEach(function (m) {
       let keys;
@@ -957,12 +954,12 @@ logicalOperators.$not = function (obj, query) {
 logicalOperators.$where = function (obj, fn) {
   let result;
 
-  if (!isFunction(fn)) {
+  if (typeof fn !== 'function') {
     throw new Error('$where operator used without a function');
   }
 
   result = fn.call(obj);
-  if (!isBoolean(result)) {
+  if (typeof result !== 'boolean') {
     throw new Error('$where function must return boolean');
   }
 
@@ -1048,10 +1045,10 @@ function matchQueryPart(obj, queryKey, queryValue, treatObjAsValue?): boolean {
   // or only normal fields. Mixed objects are not allowed
   if (queryValue !== null && typeof queryValue === 'object' && !isRegExp(queryValue) && !Array.isArray(queryValue)) {
     keys = Object.keys(queryValue);
-    firstChars = map(keys, function (item) {
+    firstChars = keys.map(function (item) {
       return item[0];
     });
-    dollarFirstChars = filter(firstChars, function (c) {
+    dollarFirstChars = firstChars.filter(function (c) {
       return c === '$';
     });
 
